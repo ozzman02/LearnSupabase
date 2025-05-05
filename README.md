@@ -1,0 +1,2 @@
+# LearnSupabase
+Supabase Udemy course

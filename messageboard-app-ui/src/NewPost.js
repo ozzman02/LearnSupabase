@@ -2,8 +2,10 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { useState } from "react";
 import ErrorMessage from "./ErrorMessage";
+import { useCheckAuth } from "./useCheckAuth";
 
 export function NewPost() {
+	useCheckAuth();
     const navigate = useNavigate();
     const [content, setContent] = useState("");
     const [file, setFile] = useState(null);

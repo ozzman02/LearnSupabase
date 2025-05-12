@@ -18,19 +18,63 @@ export function NewPost() {
 	const [error, setError] = useState(null);
 
 	const addPost = async () => {
+
+		const imageId = Boolean(file) ? crypto.randomUUID() : null;
+
+		/* Supabase call to get current user */
 		const user = await supabase.auth.getUser();
+		
 		if (user.error) {
 			setError(user.error.message);
 			return
 		}
+		
+		/* Supabase call to insert */
 		const insertResult = await supabase.from("posts").insert({
 			content,
-			user_id: user.data.user.id
+			user_id: user.data.user.id,
+			image_id: imageId
 		});
+
 		if (insertResult.error) {
 			setError(insertResult.error.message);
 			return
 		}
+
+		if (file) {
+
+			/*
+				Supabase call to save an image in a bucket
+				
+				1. supabase.storage.from("images")
+
+					- Accesses the "images" storage bucket in Supabase.
+
+					- This bucket must already exist in your Supabase Storage settings.
+
+				2. .upload("${user.data.user.id}/${imageId}", file)
+
+					- Uploads the file into "images" using a unique path.
+
+					- The file is stored under user.data.user.id/imageId.
+
+				3. Example File Path
+					
+					- If user.data.user.id = "abc123" and imageId = "photo.jpg", this means the file gets saved in:
+
+						images/abc123/photo.jpg
+			*/
+			const response = await supabase
+				.storage
+				.from("images")
+				.upload(`${user.data.user.id}/${imageId}`, file);
+
+			if (response.error) {
+				setError(response.error.message);
+				return;	
+			}
+		}
+
 		navigate("/posts");
 	}
 

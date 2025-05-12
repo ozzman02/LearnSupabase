@@ -1,24 +1,143 @@
-import { useState } from "react";
+/* eslint-disable jsx-a11y/alt-text */
+/* eslint-disable jsx-a11y/no-redundant-roles */
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ErrorMessage from "./ErrorMessage";
 import { supabase } from "./supabase";
 import { useCheckAuth } from "./useCheckAuth";
 
 export const Posts = () => {
+
 	useCheckAuth();
-    const navigate = useNavigate();
-    const [posts, setPosts] = useState([]);
-    const [userId, setUserId] = useState(null);
-    const [error, setError] = useState(null);
+    
+	const navigate = useNavigate();
+    
+	const [posts, setPosts] = useState([]);
+    
+	const [userId, setUserId] = useState(null);
+    
+	const [error, setError] = useState(null);
 
 	const logout = async () => {
+		
+		/* Supabase call to sign out */
 		const response = await supabase.auth.signOut();
+		
 		if (response.error) {
 			setError(response.error.message);
 			return;
 		}
+
 		navigate("/login");
 	}
+
+	const getPosts = async () => {
+		
+		/* Supabase call to get all posts */
+
+		/* 
+			Understanding the Join in Your Query
+
+				1. Fetching All Columns (*) from the posts Table
+
+					- The select("*") ensures you retrieve all columns from the "posts" table.
+
+				2. Joining (user_data(email)) for Related User Data
+
+					- user_data(email) pulls the email column from the user_data table.
+
+					- This works if there’s a foreign key relationship between posts.user_id and user_data.id.
+
+					- Supabase automatically handles joins based on relationships defined in your database schema.
+
+				3. Ordering Results by created_at (Descending)
+
+					- .order("created_at", { ascending: false }) sorts posts from newest to oldest.
+
+			SQL
+
+				SELECT posts.*, user_data.email 
+				FROM posts 
+				LEFT JOIN user_data ON posts.user_id = user_data.id 
+				ORDER BY created_at DESC;
+		*/
+		const response = await supabase
+			.from("posts")
+			.select("*, user_data(email)")
+			.order("created_at", {ascending: false});
+
+		if (response.error) {
+			setError(response.error.message);
+			return;
+		}
+
+		setPosts(response.data);
+	}
+
+	const handleDelete = async (post) => {
+
+		/* Supabase call to delete */
+		await supabase
+			.from("posts")
+			.delete()
+			.match({id: post.id});
+
+		/* Delete the image associated with the post */
+		await supabase
+			.storage
+			.from("images")
+			.remove([`${post.user_id}/${post.image_id}`]);
+	}
+
+	useEffect(() => {
+		getPosts();
+	}, []);
+
+	useEffect(() => {
+		supabase.auth.getUser().then(response => {
+			if (response.error) {
+				setError(response.error.message);
+				return;
+			}
+			setUserId(response.data.user.id);
+		})
+	}, []);
+
+
+	/* Supabase call - real time */
+
+	/*
+		1. supabase.channel("posts")
+
+			- Creates a real-time listener for the "posts" table.
+
+			- The name "posts" is just an identifier—it doesn’t have to match the table name.
+
+		2. .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, getPosts)
+
+			- Listens for changes ("postgres_changes") happening in the "posts" table.
+
+			- Filters changes to only this table, inside the public schema.
+
+			- event: "*" means it listens for ALL changes:
+
+					INSERT (new posts added)
+					UPDATE (posts edited)
+					DELETE (posts removed)
+
+		3. Triggers getPosts when a change happens
+
+			- Whenever any change occurs (*), getPosts runs to refresh the displayed posts.	
+
+		4. Adding .subscribe() ensures your real-time listener actually starts receiving events from Supabase.
+	*/
+	supabase.channel("posts")
+		.on("postgres_changes", {
+			event: "*", 
+			schema: "public", 
+			table: "posts"
+		}, getPosts)
+		.subscribe();
 
     return (
         <div>
@@ -50,7 +169,15 @@ export const Posts = () => {
 
                         <ul role="list" className="divide-y divide-gray-200">
                             {posts.map((post) => {
-                                const imageUrl = "";
+                                
+								/* Get image from Supabase Bucket */
+								const imageUrl = supabase
+									.storage
+									.from("images")
+									.getPublicUrl(`${post.user_id}/${post.image_id}`)
+									.data
+									.publicUrl;
+
                                 return (
                                     <li key={post.id} className="py-4">
                                         <h4 className={"mb-4"}>
@@ -66,7 +193,7 @@ export const Posts = () => {
                                         ) : null}
                                         {userId === post.user_id ? (
                                             <button
-                                                onClick={() => {}}
+                                                onClick={() => handleDelete(post)}
                                                 className={"text-red-500"}
                                             >
                                                 Delete

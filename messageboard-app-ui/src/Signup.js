@@ -4,17 +4,36 @@ import ErrorMessage from "./ErrorMessage";
 import { supabase } from "./supabase";
 
 export const Signup = () => {
+
     const navigate = useNavigate();
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState(null);
+    
+	const [email, setEmail] = useState("");
+    
+	const [password, setPassword] = useState("");
+    
+	const [error, setError] = useState(null);
 
 	const signup = async () => {
+		
+		/* Supabase call */
 		const response = await supabase.auth.signUp({email, password});
+		
 		if (response.error) {
 			setError(response.error.message);
 			return;
 		}
+		
+		/* Supabase call */
+		const userDataResponse = await supabase.from("user_data").insert({
+			email: response.data.user.email,
+			user_id: response.data.user.id
+		});
+
+		if (userDataResponse.error) {
+			setError(userDataResponse.error.message);
+			return;
+		}
+		
 		navigate("/posts");
 	}
 

@@ -4,16 +4,24 @@ import ErrorMessage from "./ErrorMessage";
 import { supabase } from "./supabase";
 
 export const Login = () => {
-    const navigate = useNavigate();
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState(null)
+    
+	const navigate = useNavigate();
+    
+	const [email, setEmail] = useState("");
+    
+	const [password, setPassword] = useState("");
+    
+	const [error, setError] = useState(null)
 
 	const login = async () => {
+
+		/* Supabase call to sign in */
 		const response = await supabase.auth.signInWithPassword({email, password});
+		
 		if (response.error) {
 			setError(response.error.message);
 		}
+
 		navigate("/posts");
 	}
 
